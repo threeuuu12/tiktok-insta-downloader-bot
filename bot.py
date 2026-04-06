@@ -57,23 +57,23 @@ async def download_content(url: str, message: types.Message):
 
     await message.reply("جاري التحميل بجودة عالية... ⏳")
 
-    # إعدادات محسنة لإنستغرام ريلز
+    # إعدادات محسنة جدًا لإنستغرام ريلز 2026
     ydl_opts = {
         'outtmpl': 'media_%(id)s.%(ext)s',
-        'format': 'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best',
+        'format': 'bestvideo+bestaudio/best',
         'noplaylist': True,
         'quiet': True,
         'no_warnings': True,
         'merge_output_format': 'mp4',
-        'postprocessors': [{
-            'key': 'FFmpegVideoConvertor',
-            'preferedformat': 'mp4',
-        }],
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15'
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1'
         },
-        # خيارات إضافية لإنستغرام
-        'extractor_args': {'instagram': {'stories': False}}
+        # خيارات خاصة لإنستغرام
+        'extractor_args': {
+            'instagram': {
+                'player_client': ['ios', 'android', 'web']
+            }
+        }
     }
 
     try:
@@ -96,10 +96,13 @@ async def download_content(url: str, message: types.Message):
             os.remove(filename)
 
     except Exception as e:
-        logging.error(f"Error downloading {url}: {e}")
-        await message.reply("❌ فشل تحميل ريلز إنستغرام\nجرب رابط ريلز آخر أو تأكد أنه عام")
+        error = str(e).lower()
+        if "login" in error or "rate-limit" in error or "not available" in error:
+            await message.reply("❌ إنستغرام يطلب تسجيل دخول أو وصلنا للحد\nجرب رابط ريلز آخر أو انتظر قليلاً")
+        else:
+            await message.reply("❌ فشل تحميل الريلز\nجرب رابط آخر")
 
-# باقي الكود يبقى كما هو (handle_message, premium_handler, main, إلخ)         
+# باقي الكود (handle_message, premium_handler, main...) يبقى كما هو         
 @dp.message()
 async def handle_message(message: types.Message):
     text = message.text.strip()
