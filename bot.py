@@ -3,10 +3,8 @@ import asyncio
 import logging
 import os
 import re
-import sqlite3
-from datetime import datetime, timedelta
 from aiogram import Bot, Dispatcher, types
-from aiogram.types import FSInputFile, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import FSInputFile
 from dotenv import load_dotenv
 import yt_dlp
 
@@ -19,60 +17,18 @@ if not BOT_TOKEN:
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# قاعدة بيانات بسيطة للحد اليومي
-conn = sqlite3.connect('users.db')
-conn.execute('''CREATE TABLE IF NOT EXISTS users 
-                (user_id INTEGER PRIMARY KEY, count INTEGER, last_reset TEXT)''')
-conn.commit()
-
-def check_daily_limit(user_id: int) -> bool:
-    today = datetime.now().date().isoformat()
-    cursor = conn.execute("SELECT count, last_reset FROM users WHERE user_id=?", (user_id,))
-    row = cursor.fetchone()
-    
-    if not row or row[1] != today:
-        conn.execute("REPLACE INTO users (user_id, count, last_reset) VALUES (?, 1, ?)", (user_id, today))
-        conn.commit()
-        return True
-    
-    if row[0] < 10:
-        conn.execute("UPDATE users SET count = count + 1 WHERE user_id=?", (user_id,))
-        conn.commit()
-        return True
-    return False
-
 async def download_content(url: str, message: types.Message):
-    user_id = message.from_user.id
-    
-    if not check_daily_limit(user_id):
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="اشتراك بريميوم (غير محدود)", callback_data="premium")]
-        ])
-        await message.reply(
-            "❌ لقد وصلت إلى الحد اليومي (10 تحميلات).\n\n"
-            "اشترك في البريميوم لتحميل غير محدود + جودة أعلى:",
-            reply_markup=keyboard
-        )
-        return
+    await message.reply("جاري التحميل... ⏳")
 
-    await message.reply("جاري التحميل بجودة عالية... ⏳")
-
-    # إعدادات محسنة جدًا لإنستغرام ريلز 2026
     ydl_opts = {
         'outtmpl': 'media_%(id)s.%(ext)s',
-        'format': 'bestvideo+bestaudio/best',
+        'format': 'best[ext=mp4]/best',
         'noplaylist': True,
-        'quiet': True,
-        'no_warnings': True,
+        'quiet': False,
+        'no_warnings': False,
         'merge_output_format': 'mp4',
         'http_headers': {
             'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1'
-        },
-        # خيارات خاصة لإنستغرام
-        'extractor_args': {
-            'instagram': {
-                'player_client': ['ios', 'android', 'web']
-            }
         }
     }
 
@@ -82,7 +38,7 @@ async def download_content(url: str, message: types.Message):
             filename = ydl.prepare_filename(info)
 
         if not os.path.exists(filename):
-            await message.reply("❌ فشل التحميل، جرب رابط ريلز آخر")
+            await message.reply("❌ فشل التحميل، جرب رابط آخر")
             return
 
         await bot.send_video(
@@ -96,13 +52,9 @@ async def download_content(url: str, message: types.Message):
             os.remove(filename)
 
     except Exception as e:
-        error = str(e).lower()
-        if "login" in error or "rate-limit" in error or "not available" in error:
-            await message.reply("❌ إنستغرام يطلب تسجيل دخول أو وصلنا للحد\nجرب رابط ريلز آخر أو انتظر قليلاً")
-        else:
-            await message.reply("❌ فشل تحميل الريلز\nجرب رابط آخر")
+        logging.error(f"Download error: {e}")
+        await message.reply("❌ فشل التحميل\nجرب رابط آخر أو انتظر قليلاً")
 
-# باقي الكود (handle_message, premium_handler, main...) يبقى كما هو         
 @dp.message()
 async def handle_message(message: types.Message):
     text = message.text.strip()
@@ -110,31 +62,15 @@ async def handle_message(message: types.Message):
     if re.search(r'https?://(www\.)?(tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com)', text) or \
        re.search(r'https?://(www\.)?instagram\.com/(reel|p)/', text):
         await download_content(text, message)
-    
     elif text.startswith('/start'):
-        await message.reply(
-            "👋 مرحبا!\n\n"
-            "أرسل رابط تيك توك أو إنستغرام ريلز\n"
-            "• حد يومي: 10 تحميلات مجانية\n"
-            "• بريميوم: غير محدود + جودة أعلى"
-        )
+        await message.reply("أرسل رابط تيك توك أو إنستغرام ريلز")
     else:
         await message.reply("أرسل رابط فيديو فقط")
-
-# معالجة زر البريميوم
-@dp.callback_query(lambda c: c.data == "premium")
-async def premium_handler(callback: types.CallbackQuery):
-    await callback.answer()
-    await callback.message.reply(
-        "✅ نظام البريميوم قيد التطوير...\n\n"
-        "حالياً يمكنك التواصل معي للاشتراك اليدوي.\n"
-        "البريميوم = تحميل غير محدود + أولوية + جودة HD"
-    )
 
 async def main():
     logging.basicConfig(level=logging.INFO)
     await bot.delete_webhook(drop_pending_updates=True)
-    print("✅ البوت شغال الآن - مع حد يومي + بريميوم")
+    print("✅ البوت شغال الآن")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
