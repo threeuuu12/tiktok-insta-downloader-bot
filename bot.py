@@ -57,9 +57,10 @@ async def download_content(url: str, message: types.Message):
 
     await message.reply("جاري التحميل بجودة عالية... ⏳")
 
+    # إعدادات محسنة لإنستغرام ريلز
     ydl_opts = {
         'outtmpl': 'media_%(id)s.%(ext)s',
-        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        'format': 'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best',
         'noplaylist': True,
         'quiet': True,
         'no_warnings': True,
@@ -69,8 +70,10 @@ async def download_content(url: str, message: types.Message):
             'preferedformat': 'mp4',
         }],
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36'
-        }
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15'
+        },
+        # خيارات إضافية لإنستغرام
+        'extractor_args': {'instagram': {'stories': False}}
     }
 
     try:
@@ -79,22 +82,24 @@ async def download_content(url: str, message: types.Message):
             filename = ydl.prepare_filename(info)
 
         if not os.path.exists(filename):
-            await message.reply("❌ فشل التحميل، جرب رابط آخر")
+            await message.reply("❌ فشل التحميل، جرب رابط ريلز آخر")
             return
 
         await bot.send_video(
             chat_id=message.chat.id,
             video=FSInputFile(filename),
-            caption="✅ تم التحميل بنجاح\n(10 تحميلات يوميًا للمجاني)",
+            caption="✅ تم التحميل بنجاح",
             supports_streaming=True
         )
 
         if os.path.exists(filename):
             os.remove(filename)
 
-    except Exception:
-        await message.reply("❌ فشل التحميل، جرب رابط ريلز أو تيك توك آخر")
+    except Exception as e:
+        logging.error(f"Error downloading {url}: {e}")
+        await message.reply("❌ فشل تحميل ريلز إنستغرام\nجرب رابط ريلز آخر أو تأكد أنه عام")
 
+# باقي الكود يبقى كما هو (handle_message, premium_handler, main, إلخ)         
 @dp.message()
 async def handle_message(message: types.Message):
     text = message.text.strip()
